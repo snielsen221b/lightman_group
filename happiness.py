@@ -15,7 +15,9 @@ def happiness_probability(AU6, AU12, params):
     return sigmoid(logit)
 
 # Initial parameter estimates
-params = [-2.0, 0.5, 1.5, 1.0]
+#params = [-2.0, 0.5, 1.5, 1.0]
+# Paramater ajustments
+params = [-2.0, 0.3, 1.2, 1.8]  # increased β6_12 from 1.0 to 1.8
 
 # Test all four AU combinations
 print("Model predictions:")
