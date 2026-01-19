@@ -81,8 +81,16 @@ def happiness_probability_3au(AU6, AU12, AU25, params):
 
 
 # Initial parameter estimates for 3-AU model (to be calibrated)
-PARAMS_3AU = [-2.5, 0.3, 1.0, 0.8, 1.5, 0.5, 0.5, 1.0]
-
+#PARAMS_3AU = [-2.5, 0.3, 1.0, 0.8, 1.5, 0.5, 0.5, 1.0]
+# Make AU25 more important and raise the baseline threshold
+PARAMS_3AU = [-3.0,  # Lower baseline (harder to be happy)
+              0.3,   # AU6 alone
+              0.8,   # AU12 alone
+              0.5,   # AU25 alone (still low - very common)
+              1.2,   # AU6+AU12 interaction
+              0.3,   # AU6+AU25 interaction
+              0.5,   # AU12+AU25 interaction
+              2.0]   # All three together (strong signal)
 
 # ============================================================================
 # VALIDATION FUNCTIONS
