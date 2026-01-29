@@ -44,6 +44,34 @@ logit(P(happy)) = β₀ + β₆·AU₆ + β₁₂·AU₁₂ + β₂₅·AU₂₅
 
 **Classification threshold:** P > 0.5
 
+### Intensity Model (Theoretical Extension)
+
+**Status:** Framework developed, awaiting empirical validation
+
+Linear intensity model incorporating FACS A-E scale (0=absent, 1-5=trace to extreme):
+
+```
+logit(P(happy)) = β₀ + β₆·I₆ + β₁₂·I₁₂ + β₂₅·I₂₅ + 
+                  β₆,₁₂·(I₆·I₁₂) + β₆,₂₅·(I₆·I₂₅) + β₁₂,₂₅·(I₁₂·I₂₅)
+```
+
+Where I₆, I₁₂, I₂₅ ∈ {0, 1, 2, 3, 4, 5}
+
+**Theoretical parameters (REQUIRE VALIDATION):**
+- β₀ = -3.0
+- β₆ = 0.15, β₁₂ = 0.20, β₂₅ = 0.10 (main effects, scaled for 0-5 range)
+- β₆,₁₂ = 0.08, β₆,₂₅ = 0.03, β₁₂,₂₅ = 0.05 (intensity interactions)
+
+**Key assumptions:**
+1. Linear relationship: each intensity unit contributes proportionally
+2. Interaction terms capture synergy between intense co-activations
+3. Parameters scaled down from binary model (since inputs are 0-5, not 0-1)
+
+**Hypotheses to test:**
+- H1: Higher intensity AUs predict happiness more strongly than low intensity
+- H2: Balanced intensities (all high or all low) are more diagnostic than mixed
+- H3: Intensity model reduces false positives by distinguishing weak social smiles from genuine emotion
+
 ## Model Predictions
 
 ### 2-AU Model Output
@@ -215,10 +243,14 @@ From Table 1 (CK+ paper):
 
 ### Immediate Extensions
 
-1. **Intensity modeling**
-   - Incorporate FACS A-E intensity scale
-   - Test if weak AU 6 vs. strong AU 6 improves discrimination
-   - Hypothesis: Intensity differentiates genuine from posed smiles
+1. **Intensity modeling - EMPIRICAL VALIDATION NEEDED**
+   - **Framework complete** but requires intensity-coded dataset
+   - Search for datasets: DISFA, BP4D, or CK+ with intensity annotations
+   - Test hypotheses:
+     * H1: Strong AU activation (intensity 4-5) predicts happiness better than weak (1-2)
+     * H2: Intensity distinguishes genuine from posed/polite smiles
+     * H3: Intensity model eliminates remaining 1.5% false positives
+   - Expected outcome: Intensity improves specificity by catching weak social smiles
 
 2. **Temporal dynamics**
    - Model onset speed, apex duration, offset timing

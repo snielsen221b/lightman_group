@@ -80,8 +80,85 @@ def happiness_probability_3au(AU6, AU12, AU25, params):
     return sigmoid(logit)
 
 
-# Initial parameter estimates for 3-AU model (calibrated to CK+)
-PARAMS_3AU = [-3.0, 0.3, 0.8, 0.5, 1.2, 0.3, 0.5, 2.0]
+# ============================================================================
+# INTENSITY MODEL (Theoretical - Requires Empirical Validation)
+# ============================================================================
+
+def happiness_probability_intensity(I6, I12, I25, params):
+    """
+    Calculate P(happiness | I6, I12, I25) using intensity values
+
+    THEORETICAL MODEL - Parameters not yet empirically validated
+
+    Parameters:
+    -----------
+    I6 : int (0-5)
+        Intensity of AU6 (Cheek Raiser)
+        0=absent, 1=trace, 2=slight, 3=marked, 4=severe, 5=extreme
+    I12 : int (0-5)
+        Intensity of AU12 (Lip Corner Puller)
+    I25 : int (0-5)
+        Intensity of AU25 (Lips Part)
+    params : list of 7 floats
+        [β0, β6, β12, β25, β6_12, β6_25, β12_25]
+
+    Returns:
+    --------
+    float : probability of happiness (0 to 1)
+
+    Notes:
+    ------
+    Linear intensity model assumes each unit increase in AU intensity
+    contributes proportionally to happiness probability. Interaction
+    terms capture synergy between AU intensities.
+    """
+    β0, β6, β12, β25, β6_12, β6_25, β12_25 = params
+
+    logit = (β0 +
+             β6*I6 + β12*I12 + β25*I25 +
+             β6_12*(I6*I12) +
+             β6_25*(I6*I25) +
+             β12_25*(I12*I25))
+
+    return sigmoid(logit)
+
+
+# Theoretical parameter estimates (NEED EMPIRICAL VALIDATION)
+# Scaled down from binary model since intensities range 0-5 not 0-1
+PARAMS_INTENSITY = [-3.0, 0.15, 0.20, 0.10, 0.08, 0.03, 0.05]
+
+
+def compare_intensity_predictions():
+    """
+    Demonstrate how intensity affects predictions
+
+    Shows theoretical differences between weak and strong AU activation
+    """
+    print("\n" + "="*60)
+    print("INTENSITY MODEL - Theoretical Predictions")
+    print("="*60)
+    print("\nComparing weak vs. strong AU activation:\n")
+
+    scenarios = [
+        (0, 0, 0, "No activation"),
+        (1, 1, 1, "Trace intensity (A)"),
+        (2, 2, 2, "Slight intensity (B)"),
+        (3, 3, 3, "Marked intensity (C)"),
+        (4, 4, 4, "Severe intensity (D)"),
+        (5, 5, 5, "Extreme intensity (E)"),
+        (5, 5, 0, "Strong AU6+12, no AU25"),
+        (2, 5, 3, "Mixed intensities"),
+    ]
+
+    for I6, I12, I25, description in scenarios:
+        p = happiness_probability_intensity(I6, I12, I25, PARAMS_INTENSITY)
+        decision = "HAPPY" if p > 0.5 else "NOT HAPPY"
+        print(f"{description:30s} (I6={I6}, I12={I12}, I25={I25}): P={p:.3f} → {decision}")
+
+    print("\n" + "="*60)
+    print("NOTE: These predictions are THEORETICAL")
+    print("Parameters require validation with intensity-coded dataset")
+    print("="*60 + "\n")
 
 
 # ============================================================================
@@ -406,5 +483,9 @@ Parameters:
 """
         f.write(summary)
         print(summary)
+
+        # Show intensity model (theoretical)
+        print("\n")
+        compare_intensity_predictions()
 
     print(f"\nResults saved to: happiness_detection_results.txt")
