@@ -45,6 +45,15 @@ def happiness_probability_2au(AU6, AU12, params):
 PARAMS_2AU = [-2.0, 0.3, 1.2, 1.8]
 
 
+# Parameters for 3-AU model (calibrated to CK+)
+PARAMS_3AU = [-3.0, 0.3, 0.8, 0.5, 1.2, 0.3, 0.5, 2.0]
+
+
+# Theoretical parameter estimates for intensity model (NEED EMPIRICAL VALIDATION)
+# Scaled down from binary model since intensities range 0-5 not 0-1
+PARAMS_INTENSITY = [-3.0, 0.15, 0.20, 0.10, 0.08, 0.03, 0.05]
+
+
 # ============================================================================
 # 3-AU MODEL (CK+ Definition: AU6 + AU12 + AU25)
 # ============================================================================
@@ -123,9 +132,234 @@ def happiness_probability_intensity(I6, I12, I25, params):
     return sigmoid(logit)
 
 
-# Theoretical parameter estimates (NEED EMPIRICAL VALIDATION)
-# Scaled down from binary model since intensities range 0-5 not 0-1
-PARAMS_INTENSITY = [-3.0, 0.15, 0.20, 0.10, 0.08, 0.03, 0.05]
+# ============================================================================
+# MULTI-CLASS EMOTION DETECTION (7 Basic Emotions)
+# ============================================================================
+
+def emotion_probabilities_multinomial(AUs, params):
+    """
+    Calculate P(emotion | AUs) for all 7 basic emotions using multinomial logistic regression
+
+    Parameters:
+    -----------
+    AUs : dict
+        Action unit presence, e.g., {'AU1': 0, 'AU2': 1, 'AU4': 1, ...}
+    params : dict
+        Parameters for each emotion, e.g., {'anger': [β0, β4, β5, ...], ...}
+
+    Returns:
+    --------
+    dict : Probability for each emotion (sums to 1.0)
+        e.g., {'anger': 0.05, 'contempt': 0.02, ..., 'happy': 0.75}
+    """
+    emotions = ['anger', 'contempt', 'disgust', 'fear',
+                'happy', 'sadness', 'surprise']
+
+    # Calculate logit for each emotion
+    logits = {}
+    for emotion in emotions:
+        logits[emotion] = _calculate_emotion_logit(AUs, params[emotion], emotion)
+
+    # Softmax: convert logits to probabilities that sum to 1
+    exp_logits = {e: np.exp(logits[e]) for e in emotions}
+    total = sum(exp_logits.values())
+
+    probs = {e: exp_logits[e] / total for e in emotions}
+    return probs
+
+
+def _calculate_emotion_logit(AUs, emotion_params, emotion_name):
+    """
+    Calculate logit for a specific emotion based on AU presence
+
+    Uses theory-driven feature selection based on Ekman's FACS definitions
+    """
+    # Emotion-specific AU mappings from CK+ Table 2
+    au_mappings = {
+        'anger': ['AU4', 'AU5', 'AU7', 'AU23'],
+        'contempt': ['AU14'],
+        'disgust': ['AU9', 'AU10'],
+        'fear': ['AU1', 'AU2', 'AU4', 'AU5', 'AU20', 'AU26'],
+        'happy': ['AU6', 'AU12', 'AU25'],
+        'sadness': ['AU1', 'AU4', 'AU11', 'AU15', 'AU17'],
+        'surprise': ['AU1', 'AU2', 'AU5', 'AU26']
+    }
+
+    relevant_aus = au_mappings[emotion_name]
+
+    # β0 is intercept, rest are AU coefficients
+    logit = emotion_params[0]  # β0
+
+    for idx, au in enumerate(relevant_aus):
+        au_value = AUs.get(au, 0)
+        logit += emotion_params[idx + 1] * au_value
+
+    return logit
+
+
+# Theory-driven parameter initialization
+# Based on CK+ Table 2 emotion definitions
+# β0 (baseline) is negative, AUs in definition get positive weights
+
+PARAMS_MULTICLASS = {
+    'anger': [-2.0, 1.5, 1.2, 1.0, 1.8],  # β0, AU4, AU5, AU7, AU23
+    'contempt': [-3.0, 2.5],               # β0, AU14
+    'disgust': [-2.5, 2.0, 2.0],          # β0, AU9, AU10
+    'fear': [-2.0, 1.0, 1.0, 0.8, 0.8, 1.2, 1.0],  # β0, AU1, AU2, AU4, AU5, AU20, AU26
+    'happy': [-3.0, 1.5, 1.5, 1.0],       # β0, AU6, AU12, AU25
+    'sadness': [-2.0, 1.0, 1.2, 1.5, 1.3, 0.8],    # β0, AU1, AU4, AU11, AU15, AU17
+    'surprise': [-2.5, 1.2, 1.2, 1.8, 1.0]         # β0, AU1, AU2, AU5, AU26
+}
+
+
+def predict_emotion(AUs, params=PARAMS_MULTICLASS):
+    """
+    Predict the most likely emotion given AU presence
+
+    Parameters:
+    -----------
+    AUs : dict
+        Action unit presence/absence
+    params : dict
+        Model parameters for each emotion
+
+    Returns:
+    --------
+    tuple : (predicted_emotion, confidence, all_probabilities)
+    """
+    probs = emotion_probabilities_multinomial(AUs, params)
+
+    predicted_emotion = max(probs, key=probs.get)
+    confidence = probs[predicted_emotion]
+
+    return predicted_emotion, confidence, probs
+
+
+def create_ck_plus_multiclass_dataset():
+    """
+    Create synthetic multi-class dataset based on CK+ Table 2 AU definitions
+
+    Returns:
+    --------
+    list : [(AUs_dict, emotion_label), ...]
+    """
+    dataset = []
+
+    # From CK+ Table 3: emotion frequencies
+    emotion_counts = {
+        'anger': 45,
+        'contempt': 18,
+        'disgust': 59,
+        'fear': 25,
+        'happy': 69,
+        'sadness': 28,
+        'surprise': 83
+    }
+
+    # Prototypic AU patterns for each emotion (from Table 2)
+    prototypic_patterns = {
+        'anger': {'AU4': 1, 'AU5': 1, 'AU7': 1, 'AU23': 1},
+        'contempt': {'AU14': 1},
+        'disgust': {'AU9': 1, 'AU10': 1},
+        'fear': {'AU1': 1, 'AU2': 1, 'AU4': 1, 'AU5': 1, 'AU20': 1, 'AU26': 1},
+        'happy': {'AU6': 1, 'AU12': 1, 'AU25': 1},
+        'sadness': {'AU1': 1, 'AU4': 1, 'AU15': 1, 'AU17': 1},
+        'surprise': {'AU1': 1, 'AU2': 1, 'AU5': 1, 'AU26': 1}
+    }
+
+    # Create samples for each emotion
+    for emotion, count in emotion_counts.items():
+        for _ in range(count):
+            # Start with prototypic pattern
+            aus = prototypic_patterns[emotion].copy()
+            dataset.append((aus, emotion))
+
+    return dataset
+
+
+def validate_multiclass_model(params, dataset):
+    """
+    Validate multi-class model against labeled dataset
+
+    Returns:
+    --------
+    dict : {'accuracy': float, 'confusion_matrix': dict, ...}
+    """
+    from collections import defaultdict
+
+    # Initialize confusion matrix
+    emotions = ['anger', 'contempt', 'disgust', 'fear',
+                'happy', 'sadness', 'surprise']
+    confusion = {true_e: {pred_e: 0 for pred_e in emotions}
+                 for true_e in emotions}
+
+    correct = 0
+    total = len(dataset)
+
+    for aus, true_emotion in dataset:
+        predicted_emotion, confidence, probs = predict_emotion(aus, params)
+
+        confusion[true_emotion][predicted_emotion] += 1
+
+        if predicted_emotion == true_emotion:
+            correct += 1
+
+    accuracy = correct / total
+
+    # Calculate per-emotion accuracy
+    per_emotion_accuracy = {}
+    for emotion in emotions:
+        total_for_emotion = sum(confusion[emotion].values())
+        if total_for_emotion > 0:
+            per_emotion_accuracy[emotion] = confusion[emotion][emotion] / total_for_emotion
+        else:
+            per_emotion_accuracy[emotion] = 0.0
+
+    return {
+        'accuracy': accuracy,
+        'confusion_matrix': confusion,
+        'per_emotion_accuracy': per_emotion_accuracy
+    }
+
+
+def print_multiclass_results(results):
+    """Print multi-class validation results"""
+    emotions = ['anger', 'contempt', 'disgust', 'fear',
+                'happy', 'sadness', 'surprise']
+
+    print("\n" + "="*60)
+    print("MULTI-CLASS EMOTION DETECTION - Validation Results")
+    print("="*60)
+    print(f"\nOverall Accuracy: {results['accuracy']:.1%}")
+
+    print("\nPer-Emotion Accuracy:")
+    print("-" * 60)
+    for emotion in emotions:
+        acc = results['per_emotion_accuracy'][emotion]
+        print(f"{emotion.capitalize():12s}: {acc:.1%}")
+
+    print("\nConfusion Matrix:")
+    print("-" * 60)
+
+    # Print header
+    print(f"{'Actual':12s} | ", end='')
+    for e in emotions:
+        print(f"{e[:2].upper():>4s} ", end='')
+    print()
+    print("-" * 60)
+
+    # Print rows
+    for true_emotion in emotions:
+        print(f"{true_emotion[:10]:12s} | ", end='')
+        for pred_emotion in emotions:
+            count = results['confusion_matrix'][true_emotion][pred_emotion]
+            print(f"{count:4d} ", end='')
+        print()
+
+    print("\n" + "="*60)
+    print("Note: Confusion matrix shows predicted counts")
+    print("Compare to CK+ Tables 5-7 for validation")
+    print("="*60 + "\n")
 
 
 def compare_intensity_predictions():
@@ -487,5 +721,34 @@ Parameters:
         # Show intensity model (theoretical)
         print("\n")
         compare_intensity_predictions()
+
+        # Test multi-class model
+        print("\n" + "="*60)
+        print("TESTING MULTI-CLASS EMOTION DETECTION")
+        print("="*60)
+
+        # Create and validate multi-class dataset
+        dataset_multiclass = create_ck_plus_multiclass_dataset()
+        results_multiclass = validate_multiclass_model(PARAMS_MULTICLASS, dataset_multiclass)
+        print_multiclass_results(results_multiclass)
+
+        # Example predictions
+        print("\nExample Predictions:")
+        print("-" * 60)
+
+        example_cases = [
+            ({'AU6': 1, 'AU12': 1, 'AU25': 1}, "Prototypic happy"),
+            ({'AU4': 1, 'AU5': 1, 'AU7': 1, 'AU23': 1}, "Prototypic anger"),
+            ({'AU1': 1, 'AU2': 1, 'AU5': 1, 'AU26': 1}, "Prototypic surprise"),
+            ({'AU9': 1}, "Disgust (AU9 only)"),
+        ]
+
+        for aus, description in example_cases:
+            emotion, conf, probs = predict_emotion(aus, PARAMS_MULTICLASS)
+            print(f"\n{description}:")
+            print(f"  Predicted: {emotion.capitalize()} ({conf:.1%} confidence)")
+            print(f"  Top 3: ", end='')
+            sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:3]
+            print(", ".join([f"{e}:{p:.1%}" for e, p in sorted_probs]))
 
     print(f"\nResults saved to: happiness_detection_results.txt")
